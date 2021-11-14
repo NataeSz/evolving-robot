@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 from itertools import product
-from typing import List
+from typing import List, Tuple
 
 possible_states = {0: 'Empty', 1: 'Can', -1: 'Wall'}
 genetic_code_directions = ['North', 'South', 'East', 'West', 'Current']
@@ -16,6 +16,7 @@ actions_dict = dict(zip(
     list(range(len(actions))),
     actions
 ))
+movement_cons = {0: (0, 0), 1: (-1, 0), 2: (1, 0), 3: (0, 1), 4: (0, -1), 6: (0, 0)}
 
 
 # class Robot:
@@ -27,13 +28,52 @@ actions_dict = dict(zip(
 #         self.score = 0
 #         self.current_position = [0, 0]
 
+class GridWithRobot:
+    def __init__(self, grid_size: int = 10, can_probability: float = 0.1):
+        self.current_position = (0, 0)
+        self.score = 0
+        self.grid = self.__create_map(grid_size=grid_size, can_probability=can_probability)
 
-def create_map(grid_size: int = 10, can_probability: float = 0.1) -> list:
-    grid = np.random.choice(
-        a=[0, 1],
-        size=(grid_size,) * 2,
-        p=[1 - can_probability, can_probability])
-    return grid
+    @staticmethod
+    def __create_map(grid_size: int = 10, can_probability: float = 0.1) -> list:
+        grid = np.random.choice(
+            a=[0, 1],
+            size=(grid_size,) * 2,
+            p=[1 - can_probability, can_probability])
+        return grid
+
+    def __get_new_position(self, vector):
+        return tuple(map(
+            sum,
+            zip(self.current_position, vector)
+        ))
+
+    def update_position(self, action) -> Tuple[float, Tuple[int, int]]:
+        # Check if an action is possible
+        if not self.__is_action_possible():
+            return
+        # Update current_position
+        new_position = self.__get_new_position(vector=movement_cons[action])
+
+
+
+        # Update grid
+
+    def __is_action_possible(self, action):
+        max_index = self.grid.shape[0] - 1
+        # Move_up
+        if (action == 1) and (self.current_position[0] == 0):
+            return False
+        # Move_down
+        if (action == 2) and (self.current_position[0] == max_index):
+            return False
+        # Move_right
+        if (action == 3) and (self.current_position[1] == max_index):
+            return False
+        # Move_left
+        if (action == 4) and (self.current_position[1] == 0):
+            return False
+        return True
 
 
 def choose_action(
@@ -61,13 +101,11 @@ def choose_action(
     pass
 
 
-def update_map(grid, current_position: List[int], action: int) -> (list, List[int]):
-
+def update_state(grid, current_position: List[int], action: int) -> (list, List[int]):
     pass
 
 
 def get_points(grid, current_position: List[int], action) -> int:
-
     # Collecting an empty soda can: +10 pts
 
     # Failing to pick a can(trying on empty square): -1 pt
@@ -102,9 +140,9 @@ def run_simulation(
 
         for _ in range(iterations):
             action = choose_action(genetic_codes[i], grid, current_position)
-            points_for_action = get_points(genetic_code=genetic_codes[i], action=action)
+            # points_for_action = get_points(genetic_code=genetic_codes[i], action=action)
+            grid, current_position, points_for_action = update_state(grid, current_position, action)
             score += points_for_action
-            grid, current_position = update_map(grid, current_position, action)
 
     return simulation_result
 
