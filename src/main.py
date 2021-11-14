@@ -19,19 +19,9 @@ actions_dict = dict(zip(
 movement_vectors = {0: (0, 0), 1: (-1, 0), 2: (1, 0), 3: (0, 1), 4: (0, -1), 6: (0, 0)}
 
 
-# class Robot:
-#     def __init__(self,
-#                  genetic_code: List[int],
-#                  grid):
-#         self.genetic_code = genetic_code
-#         self.grid = grid
-#         self.score = 0
-#         self.current_position = [0, 0]
-
 class GridWithRobot:
     def __init__(self, grid_size: int = 10, can_probability: float = 0.1):
         self.current_position = (0, 0)
-        self.score = 0
         self.grid = self.__create_map(grid_size=grid_size, can_probability=can_probability)
 
     @staticmethod
@@ -42,27 +32,35 @@ class GridWithRobot:
             p=[1 - can_probability, can_probability])
         return grid
 
-    def __get_new_position(self, vector):
+    def __get_new_position(self, vector: tuple) -> tuple:
         sum_of_vectors = tuple(map(
             sum,
             zip(self.current_position, vector)
         ))
         return sum_of_vectors
 
-    def update_position(self, action) -> Tuple[float, Tuple[int, int]]:
+    def __is_action_possible(self, new_position: int) -> bool:
+        # Out-of-range indices
+        boundaries = (-1, self.grid.shape[0])
+        # Check if new position is possible (no wall)
+        possible = not any(x in boundaries for x in new_position)
+        return possible
+
+    def take_movement(self, action) -> int:
+        points = 0
         if action == 6:
-            return
+            return points
 
         # If trying to pick up a can:
         if action == 0:
             # check if can in current position
             if self.grid[self.current_position] == 1:
-                self.score += 10
+                points = 10
                 self.grid[self.current_position] = 0
-                return
+                return points
             # if no can
-            self.score -= 1
-            return
+            points = -1
+            return points
 
         # If random movement:
         if action == 5:
@@ -73,18 +71,11 @@ class GridWithRobot:
         # Check if new position is possible (no wall)
         if not self.__is_action_possible(new_position):
             # Action impossible - wall
-            self.score -= 10
-            return
+            points = -10
+            return points
         # no wall -> movement
         self.current_position = new_position
-
-
-    def __is_action_possible(self, new_position):
-        # Out-of-range indices
-        boundaries = (-1, self.grid.shape[0])
-        # Check if new position is possible (no wall)
-        possible = not any(x in boundaries for x in new_position)
-        return possible
+        return points
 
 
 def choose_action(
@@ -145,14 +136,13 @@ def run_simulation(
 
     simulation_result = {}
     for i in range(number_of_robots):
-        grid = create_map(grid_size)
+        grid_with_robot = GridWithRobot(grid_size=grid_size)
         score = 0
-        current_position = [0, 0]
 
         for _ in range(iterations):
-            action = choose_action(genetic_codes[i], grid, current_position)
-            # points_for_action = get_points(genetic_code=genetic_codes[i], action=action)
-            grid, current_position, points_for_action = update_state(grid, current_position, action)
+            action = choose_action(genetic_codes[i], grid_with_robot.grid, grid_with_robot.current_position)
+            points_for_action = grid_with_robot.take_movement(action)
+            assert points_for_action in [0, -1, -10, 10]
             score += points_for_action
 
     return simulation_result
