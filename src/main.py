@@ -16,7 +16,7 @@ actions_dict = dict(zip(
     list(range(len(actions))),
     actions
 ))
-movement_cons = {0: (0, 0), 1: (-1, 0), 2: (1, 0), 3: (0, 1), 4: (0, -1), 6: (0, 0)}
+movement_vectors = {0: (0, 0), 1: (-1, 0), 2: (1, 0), 3: (0, 1), 4: (0, -1), 6: (0, 0)}
 
 
 # class Robot:
@@ -43,37 +43,48 @@ class GridWithRobot:
         return grid
 
     def __get_new_position(self, vector):
-        return tuple(map(
+        sum_of_vectors = tuple(map(
             sum,
             zip(self.current_position, vector)
         ))
+        return sum_of_vectors
 
     def update_position(self, action) -> Tuple[float, Tuple[int, int]]:
-        # Check if an action is possible
-        if not self.__is_action_possible():
+        if action == 6:
             return
-        # Update current_position
-        new_position = self.__get_new_position(vector=movement_cons[action])
+
+        # If trying to pick up a can:
+        if action == 0:
+            # check if can in current position
+            if self.grid[self.current_position] == 1:
+                self.score += 10
+                self.grid[self.current_position] = 0
+                return
+            # if no can
+            self.score -= 1
+            return
+
+        # If random movement:
+        if action == 5:
+            action = np.random.randint(low=1, high=5)
+
+        # Get new position
+        new_position = self.__get_new_position(vector=movement_vectors[action])
+        # Check if new position is possible (no wall)
+        if not self.__is_action_possible(new_position):
+            # Action impossible - wall
+            self.score -= 10
+            return
+        # no wall -> movement
+        self.current_position = new_position
 
 
-
-        # Update grid
-
-    def __is_action_possible(self, action):
-        max_index = self.grid.shape[0] - 1
-        # Move_up
-        if (action == 1) and (self.current_position[0] == 0):
-            return False
-        # Move_down
-        if (action == 2) and (self.current_position[0] == max_index):
-            return False
-        # Move_right
-        if (action == 3) and (self.current_position[1] == max_index):
-            return False
-        # Move_left
-        if (action == 4) and (self.current_position[1] == 0):
-            return False
-        return True
+    def __is_action_possible(self, new_position):
+        # Out-of-range indices
+        boundaries = (-1, self.grid.shape[0])
+        # Check if new position is possible (no wall)
+        possible = not any(x in boundaries for x in new_position)
+        return possible
 
 
 def choose_action(
