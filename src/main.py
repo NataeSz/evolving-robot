@@ -32,20 +32,6 @@ class GridWithRobot:
             p=[1 - can_probability, can_probability])
         return grid
 
-    def __get_new_position(self, vector: tuple) -> tuple:
-        sum_of_vectors = tuple(map(
-            sum,
-            zip(self.current_position, vector)
-        ))
-        return sum_of_vectors
-
-    def __is_action_possible(self, new_position: int) -> bool:
-        # Out-of-range indices
-        boundaries = (-1, self.grid.shape[0])
-        # Check if new position is possible (no wall)
-        possible = not any(x in boundaries for x in new_position)
-        return possible
-
     def take_movement(self, action) -> int:
         points = 0
         if action == 6:
@@ -67,9 +53,9 @@ class GridWithRobot:
             action = np.random.randint(low=1, high=5)
 
         # Get new position
-        new_position = self.__get_new_position(vector=movement_vectors[action])
+        new_position = get_new_position(current_position=self.current_position, vector=movement_vectors[action])
         # Check if new position is possible (no wall)
-        if not self.__is_action_possible(new_position):
+        if not is_action_possible(self.grid, new_position):
             # Action impossible - wall
             points = -10
             return points
@@ -78,29 +64,44 @@ class GridWithRobot:
         return points
 
 
+def get_new_position(current_position: tuple, vector: tuple) -> tuple:
+    sum_of_vectors = tuple(map(
+        sum,
+        zip(current_position, vector)
+    ))
+    return sum_of_vectors
+
+
+def is_action_possible(grid, new_position: int) -> bool:
+    # Out-of-range indices
+    boundaries = (-1, grid.shape[0])
+    # Check if new position is possible (no wall)
+    possible = not any(x in boundaries for x in new_position)
+    return possible
+
+
 def choose_action(
         genetic_code: List[int],
         grid: list,
         current_position: list) -> int:
+
     idx = []
-    # Get North
+    for val in list(movement_vectors.keys())[1:]:  # check for 'North', 'South', 'East', 'West', 'Current'
+        checked_position = get_new_position(current_position=current_position, vector=movement_vectors[val])
 
-    # Get South
+        if not is_action_possible(grid, checked_position):
+            idx.append(-1)
+        else:
+            idx.append(grid[checked_position])
 
-    # Get East
-
-    # Get West
-
-    # Get Current
-    grid[current_position[0], current_position[1]]
-
-    # Get genetic code index
+    # get action index
+    action_idx = genetic_code_dict[tuple(idx)]
 
     # Get action based on the genetic code
+    action = genetic_code[action_idx]
 
     # Return action number
-
-    pass
+    return action
 
 
 def update_state(grid, current_position: List[int], action: int) -> (list, List[int]):
