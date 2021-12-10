@@ -104,19 +104,48 @@ def choose_action(
     return action
 
 
-def update_state(grid, current_position: List[int], action: int) -> (list, List[int]):
+def get_generation(
+        genetic_codes: list,
+        number_of_robots: int = 1000,
+        grid_size: int = 10
+) -> dict:
+    iterations = grid_size ** 2
+
+    scores = {}
+    for i in range(number_of_robots):
+        grid_with_robot = GridWithRobot(grid_size=grid_size)
+        score = 0
+
+        for _ in range(iterations):
+            action = choose_action(
+                genetic_code=genetic_codes[i],
+                grid=grid_with_robot.grid,
+                current_position=grid_with_robot.current_position)
+
+            points_for_action = grid_with_robot.take_movement(action)
+
+            assert points_for_action in [0, -1, -10, 10]
+            score += points_for_action
+
+        scores[i] = max(score, 0)
+
+    return scores
+
+
+def get_probabilities(scores: dict) -> dict:
+    scores_sum = sum(scores.values())
+    if scores_sum == 0:
+        raise ValueError("Sum of scores is equal to 0")
+
+    proba = {key: value/scores_sum for key, value in scores.items()}
+    return proba
+
+
+def choose_pair_to_evolve():
     pass
 
 
-def get_points(grid, current_position: List[int], action) -> int:
-    # Collecting an empty soda can: +10 pts
-
-    # Failing to pick a can(trying on empty square): -1 pt
-
-    # Crashing into wall(trying to move outside of the world grid): -5 pt
-
-    # Else: 0
-
+def update_state(grid, current_position: List[int], action: int) -> (list, List[int]):
     pass
 
 
@@ -126,28 +155,6 @@ def update_genetic_code():
 
 def evolve():
     pass
-
-
-def run_simulation(
-        genetic_codes: list,
-        number_of_robots: int = 1000,
-        grid_size: int = 10
-) -> dict:
-    iterations = grid_size ** 2
-
-    simulation_result = {}
-    for i in range(number_of_robots):
-        grid_with_robot = GridWithRobot(grid_size=grid_size)
-        score = 0
-
-        for _ in range(iterations):
-            action = choose_action(genetic_codes[i], grid_with_robot.grid, grid_with_robot.current_position)
-            points_for_action = grid_with_robot.take_movement(action)
-            assert points_for_action in [0, -1, -10, 10]
-            score += points_for_action
-
-    return simulation_result
-
 
 def plot_results(results: list):
     pass
@@ -168,10 +175,11 @@ if __name__ == "__main__":
 
     results = []
     for _ in tqdm(range(number_of_generations)):
-        simulation = run_simulation(
+        generation_scores = get_generation(
             genetic_codes=genetic_codes,
             number_of_robots=number_of_robots,
             grid_size=grid_size)
-        results.append(simulation['score'])
+        results.append(max(generation_scores))
+        probabilities = get_probabilities(generation_scores)
 
     plot_results(results)
