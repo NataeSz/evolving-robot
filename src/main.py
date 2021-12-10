@@ -1,8 +1,8 @@
 import numpy as np
-import pandas as pd
 from tqdm import tqdm
 from itertools import product
 from typing import List, Tuple
+import matplotlib.pyplot as plt
 
 possible_states = {0: 'Empty', 1: 'Can', -1: 'Wall'}
 genetic_code_directions = ['North', 'South', 'East', 'West', 'Current']
@@ -20,7 +20,7 @@ movement_vectors = {0: (0, 0), 1: (-1, 0), 2: (1, 0), 3: (0, 1), 4: (0, -1), 6: 
 
 
 class GridWithRobot:
-    def __init__(self, grid_size: int = 10, can_probability: float = 0.1):
+    def __init__(self, grid_size: int = 10, can_probability: float = 0.5):
         self.current_position = (0, 0)
         self.grid = self.__create_map(grid_size=grid_size, can_probability=can_probability)
 
@@ -84,7 +84,6 @@ def choose_action(
         genetic_code: List[int],
         grid: list,
         current_position: list) -> int:
-
     idx = []
     for val in list(movement_vectors.keys())[1:]:  # check for 'North', 'South', 'East', 'West', 'Current'
         checked_position = get_new_position(current_position=current_position, vector=movement_vectors[val])
@@ -137,27 +136,55 @@ def get_probabilities(scores: dict) -> dict:
     if scores_sum == 0:
         raise ValueError("Sum of scores is equal to 0")
 
-    proba = {key: value/scores_sum for key, value in scores.items()}
+    proba = {key: value / scores_sum for key, value in scores.items()}
     return proba
 
 
-def choose_pair_to_evolve():
-    pass
+def choose_pair_to_evolve(proba: dict):
+    pair = np.random.choice(
+        a=list(proba.keys()),
+        size=2,
+        p=list(proba.values()),
+        replace=False)
+    return tuple(pair)
 
 
-def update_state(grid, current_position: List[int], action: int) -> (list, List[int]):
-    pass
+def evolve(parent1: list, parent2: list) -> (list, list):
+    cutoff = int(len(parent1) / 2)
+
+    # offspring
+    child0 = parent1[:cutoff] + parent2[cutoff:]
+    child1 = parent2[:cutoff] + parent1[cutoff:]
+
+    # mutation
+    for child in [child0, child1]:
+        idx_to_mutate = np.random.randint(low=0, high=len(child))
+        previous_code = child[idx_to_mutate]
+        while child[idx_to_mutate] == previous_code:
+            child[idx_to_mutate] = np.random.randint(low=0, high=len(actions))
+
+    return child0, child1
 
 
-def update_genetic_code():
-    pass
+def evolve_generation(generation_scores: dict, genetic_codes: dict) -> dict:
+    probabilities = get_probabilities(generation_scores)
+    new_genetic_codes = {}
+    for key in range(0, len(genetic_codes), 2):
+        pair = choose_pair_to_evolve(proba=probabilities)
+        parent1, parent2 = [genetic_codes[parent] for parent in pair]
+        new_genetic_codes[key], new_genetic_codes[key + 1] = evolve(parent1, parent2)
+
+    return new_genetic_codes
 
 
-def evolve():
-    pass
-
-def plot_results(results: list):
-    pass
+def plot_results(results: list, type: str = 'Max') -> None:
+    fig = plt.figure(figsize=(12, 6))
+    plt.plot(range(len(results)), results)
+    plt.title(type + ' fitness in population')
+    plt.xlabel('Generation number')
+    plt.ylabel(type + ' fitness')
+    plt.savefig(f'docs/{type}_fitness.png', dpi=fig.dpi)
+    plt.show()
 
 
 if __name__ == "__main__":
@@ -167,19 +194,23 @@ if __name__ == "__main__":
 
     # Generating initial genetic code randomly
     genetic_codes = [
-        np.random.choice(
+        list(np.random.choice(
             len(actions),
-            len(genetic_code_dict))
+            len(genetic_code_dict)))
         for _ in range(number_of_robots)
     ]
 
     results = []
+    results_max = []
     for _ in tqdm(range(number_of_generations)):
         generation_scores = get_generation(
             genetic_codes=genetic_codes,
             number_of_robots=number_of_robots,
             grid_size=grid_size)
-        results.append(max(generation_scores))
-        probabilities = get_probabilities(generation_scores)
+        # print('\n', np.mean(generation_scores.values()), max(generation_scores.values()))
+        results.append(np.mean(list(generation_scores.values())))
+        results_max.append(max(generation_scores.values()))
+        genetic_codes = evolve_generation(generation_scores, genetic_codes)
 
-    plot_results(results)
+    plot_results(results_max, 'max')
+    plot_results(results, 'avg')
