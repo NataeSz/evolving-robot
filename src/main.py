@@ -25,14 +25,15 @@ class GridWithRobot:
         self.grid = self.__create_map(grid_size=grid_size, can_probability=can_probability)
 
     @staticmethod
-    def __create_map(grid_size: int = 10, can_probability: float = 0.1) -> list:
-        grid = np.random.choice(
-            a=[0, 1],
-            size=(grid_size,) * 2,
-            p=[1 - can_probability, can_probability])
+    def __create_map(grid_size: int = 10, can_probability: float = 0.5) -> list:
+        can_quantity = int((grid_size**2) * can_probability)
+        grid = np.zeros(grid_size**2)
+        can_indices = np.random.choice(list(range(grid_size**2)), size=can_quantity, replace=False)
+        grid[can_indices] = 1
+        grid = grid.reshape((grid_size, grid_size))
         return grid
 
-    def take_movement(self, action) -> int:
+    def take_movement(self, action: int) -> int:
         points = 0
         if action == 6:
             return points
@@ -64,7 +65,7 @@ class GridWithRobot:
         return points
 
 
-def get_new_position(current_position: tuple, vector: tuple) -> tuple:
+def get_new_position(current_position: Tuple[int], vector: Tuple[int]) -> tuple:
     sum_of_vectors = tuple(map(
         sum,
         zip(current_position, vector)
@@ -72,7 +73,7 @@ def get_new_position(current_position: tuple, vector: tuple) -> tuple:
     return sum_of_vectors
 
 
-def is_action_possible(grid, new_position: int) -> bool:
+def is_action_possible(grid: List[int], new_position: int) -> bool:
     # Out-of-range indices
     boundaries = (-1, grid.shape[0])
     # Check if new position is possible (no wall)
@@ -104,7 +105,7 @@ def choose_action(
 
 
 def get_generation(
-        genetic_codes: list,
+        genetic_codes: List[int],
         number_of_robots: int = 1000,
         grid_size: int = 10
 ) -> dict:
@@ -149,7 +150,7 @@ def choose_pair_to_evolve(proba: dict):
     return tuple(pair)
 
 
-def evolve(parent1: list, parent2: list) -> (list, list):
+def evolve(parent1: List[int], parent2: List[int]) -> (list, list):
     cutoff = int(len(parent1) / 2)
 
     # offspring
@@ -177,13 +178,13 @@ def evolve_generation(generation_scores: dict, genetic_codes: dict) -> dict:
     return new_genetic_codes
 
 
-def plot_results(results: list, type: str = 'Max') -> None:
+def plot_results(results: List[int], type: str = 'Max') -> None:
     fig = plt.figure(figsize=(12, 6))
     plt.plot(range(len(results)), results)
     plt.title(type + ' fitness in population')
     plt.xlabel('Generation number')
     plt.ylabel(type + ' fitness')
-    plt.savefig(f'docs/{type}_fitness.png', dpi=fig.dpi)
+    plt.savefig(f'../docs/{type}_fitness.png', dpi=fig.dpi)
     plt.show()
 
 
