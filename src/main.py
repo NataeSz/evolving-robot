@@ -42,11 +42,14 @@ class Grid:
         self.length: int = grid_length
         self.can_count: int = can_count
         self.current_position: Tuple[int, int] = (0, 0)
-        self.grid: np.array = self.__create_map(grid_length=grid_length, can_count=can_count)
+        self.grid: np.array = self.__create_map()
 
     def __create_map(self) -> np.array:
-        grid = [0] * self.length**2
-        can_indices = np.random.choice(list(range(len(grid))), size=self.can_count, replace=False)
+        grid = np.zeros(shape=self.length**2, dtype=int)
+        can_indices = np.random.choice(
+            list(range(len(grid))),
+            size=self.can_count,
+            replace=False)
         grid[can_indices] = Neighbourhood.states['Can']
         grid = grid.reshape((self.length, self.length))
         return grid
@@ -59,7 +62,7 @@ class Grid:
 
     def __is_valid_position(self, new_position: Tuple[int, int]) -> bool:
         boundaries = (-1, self.length)  # out-of-range indices
-        valid = not any(coord in boundaries for coord in new_position) # Check if new position is possible (no wall)
+        valid = not any(coord in boundaries for coord in new_position)  # Check if new position is possible (no wall)
         return valid
 
     def __get_new_position(self, vector: Tuple[int, int]) -> Tuple[int, int]:
@@ -80,7 +83,7 @@ class Grid:
 
         new_position = self.__get_new_position(vector=Action.movement_vectors[action])
         if not self.__is_valid_position(new_position=new_position):
-            return Rewards.WALL  # action impossible - wall
+            return Rewards.WALL  # wall: action impossible
 
         self.current_position = new_position
         return Rewards.NO_POINTS
@@ -117,7 +120,9 @@ def create_generation(
         score = 0
 
         for _ in range(iterations):
-            action = choose_action(grid_with_robot=grid_with_robot, genetic_code=genetic_codes[robot_id])
+            action = choose_action(
+                grid_with_robot=grid_with_robot,
+                genetic_code=genetic_codes[robot_id])
 
             points_for_action = grid_with_robot.move(action)
             assert points_for_action in [0, -1, -5, 10]
@@ -185,9 +190,9 @@ if __name__ == "__main__":
     GRID_LENGTH: int = 10
     ROBOTS_COUNT: int = 1000
     CAN_COUNT: int = 20
-    number_of_generations: int = 1000
+    GENERATIONS_COUNT: int = 1000
 
-    # Generating initial genetic code randomly
+    # Generate initial genetic code randomly
     genetic_codes: List[List[int]] = [
         list(np.random.choice(
             len(Action.actions),
@@ -198,12 +203,11 @@ if __name__ == "__main__":
     initial_grid = Grid(grid_length=GRID_LENGTH, can_count=CAN_COUNT)
     avg_results: List[int] = []
     max_results: List[int] = []
-    for _ in tqdm(range(number_of_generations)):
+    for _ in tqdm(range(GENERATIONS_COUNT)):
         generation_scores = create_generation(
             genetic_codes=genetic_codes,
             robots_count=ROBOTS_COUNT,
             initial_grid=initial_grid)
-        # print('\n', np.mean(generation_scores.values()), max(generation_scores.values()))
         avg_results.append(np.mean(list(generation_scores.values())))
         max_results.append(max(generation_scores.values()))
         genetic_codes = evolve_generation(scores=generation_scores, gen_codes=genetic_codes)
