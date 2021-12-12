@@ -1,29 +1,32 @@
 import numpy as np
+import matplotlib.pyplot as plt
 from tqdm import tqdm
 from itertools import product
 from typing import List, Tuple, Dict
-import matplotlib.pyplot as plt
 
 
-class Settings:  # TODO: dodac przedrostek
-    possible_states: Dict[int, str] = {0: 'Empty', 1: 'Can', -1: 'Wall'}  # TODO: dokoncz typy
-    genetic_code_directions: List[str] = ['North', 'South', 'East', 'West', 'Current']  # TODO: genetic_code_x do nowej klasy + metody
-    genetic_code_keys = list(product(possible_states.keys(), repeat=5))
-    genetic_code_dict = dict(zip(
-        genetic_code_keys,
-        list(range(len(genetic_code_keys)))
-    ))
-    actions = ['Pick', 'Move_up', 'Move_down', 'Move_right', 'Move_left', 'Move_random', 'Stay']
-    actions_dict = dict(zip(
-        list(range(len(actions))),
-        actions
-    ))
-    movement_vectors = {0: (0, 0), 1: (-1, 0), 2: (1, 0), 3: (0, 1), 4: (0, -1), 6: (0, 0)}
+class Neighbourhood:
+    states: Dict[str, int] = {'Empty': 0, 'Can': 1, 'Wall': -1}
+    hashes: List[Tuple[int, int, int, int, int]] = list(product(states.values(), repeat=5))
 
 
-class Action:  # ?
-    STAY = 0
-    pass
+class GeneticCode:
+    directions: List[str] = ['North', 'South', 'East', 'West', 'Current']
+    direction_indices: Dict[Tuple[int, int, int, int, int], int] = \
+        {value: hash for hash, value in enumerate(Neighbourhood.hashes)}
+
+
+class Action:
+    actions: List[str] = ['Pick', 'Move_up', 'Move_down', 'Move_right', 'Move_left', 'Move_random', 'Stay']
+    value: Dict[str, int] = {value: action for action, value in enumerate(actions)}
+    movement_vectors: Dict[int, Tuple[int, int]] = {
+        value['Pick']: (0, 0),
+        value['Move_up']: (-1, 0),
+        value['Move_down']: (1, 0),
+        value['Move_right']: (0, 1),
+        value['Move_left']: (0, -1),
+        value['Stay']: (0, 0)}
+    movement_values: List[int] = [value['Move_up'], value['Move_down'], value['Move_right'], value['Move_left']]
 
 
 class Rewards:
@@ -43,61 +46,55 @@ class GridWithRobot:
         can_count = int((grid_length**2) * can_probability)
         grid = np.zeros(grid_length**2, dtype=int)
         can_indices = np.random.choice(list(range(grid_length**2)), size=can_count, replace=False)
-        grid[can_indices] = 1
+        grid[can_indices] = Neighbourhood.states['Can']
         grid = grid.reshape((grid_length, grid_length))
         return grid
 
-    def is_on_can(self) -> bool:
+    def __is_on_can(self) -> bool:
         return bool(self.grid[self.current_position])
 
+    def __pick_can(self):
+        self.grid[self.current_position] = Neighbourhood.states['Empty']
+
     def move(self, action: int) -> int:
-        if action == Action.STAY:  # TODO: action to class - wyeliminuj magiczne liczby, poczytaj o enumach, etc.
-            return Rewards.NO_POINTS  # TODO: eliminate magic constants
+        if action == Action.value['Stay']:
+            return Rewards.NO_POINTS
 
-        # If trying to pick up a can:
-        if action == 0:
-            # check if can in current position
-            if self.is_on_can():  # TODO: admire for 1 minute
-                self.grid[self.current_position] = 0  # TODO abstract away: self.pick_can()
+        if action == Action.value['Pick']:
+            if self.__is_on_can():
+                self.__pick_can()
                 return Rewards.CAN
-            return Rewards.NO_CAN  # Rewards to tylko luzna sugestia, przekminic gdzie dodac te stale
+            return Rewards.NO_CAN
 
-        # If random movement:
-        if action == 5:
-            action = np.random.randint(low=1, high=5)  # TODO: Magiczne stale, potencjalnie wyabstachować: get_movements() -> List[Action]
+        if action == Action.value['Move_random']:
+            action = np.random.choice(Action.movement_values)  # randomize movement
 
-        # TODO: too much comments
-        # Get new position
-        new_position = self.get_new_position(vector=Settings.movement_vectors[action])
-        # Check if new position is possible (no wall)
-        if not self.is_valid_position(self.grid, new_position):
-            # Action impossible - wall
-            return Rewards.WALL
-        # no wall -> movement
+        new_position = self.get_new_position(vector=Action.movement_vectors[action])
+        if not self.is_valid_position(new_position=new_position):
+            return Rewards.WALL  # action impossible - wall
+
         self.current_position = new_position
         return Rewards.NO_POINTS
 
-    def get_new_position(self, vector: Tuple[int]) -> Tuple[int]:
+    def get_new_position(self, vector: Tuple[int, int]) -> Tuple[int, int]:
         return tuple(map(sum, zip(self.current_position, vector)))
 
-    def is_valid_position(self, new_position: int) -> bool:
-        # Out-of-range indices
-        boundaries = (-1, self.grid.shape[0])
-        # Check if new position is possible (no wall)
-        valid = not any(coord in boundaries for coord in new_position)
+    def is_valid_position(self, new_position: Tuple[int, int]) -> bool:
+        boundaries = (-1, self.grid.shape[0])  # out-of-range indices
+        valid = not any(coord in boundaries for coord in new_position) # Check if new position is possible (no wall)
         return valid
 
     def get_neighbourhood_hash(self) -> int:
         idx = []
-        for val in list(Settings.movement_vectors.keys())[1:]:  # check for 'North', 'South', 'East', 'West', 'Current'
-            checked_position = self.get_new_position(vector=Settings.movement_vectors[val])
+        for val in list(Action.movement_vectors.keys())[1:]:  # check for 'North', 'South', 'East', 'West', 'Current'
+            checked_position = self.get_new_position(vector=Action.movement_vectors[val])
 
             if not self.is_valid_position(new_position=checked_position):
                 idx.append(-1)
             else:
                 idx.append(self.grid[checked_position])
         # get action index
-        action_idx = Settings.genetic_code_dict[tuple(idx)]
+        action_idx = GeneticCode.direction_indices[tuple(idx)]
         return action_idx
 
 
@@ -107,24 +104,22 @@ def choose_action(grid_with_robot: GridWithRobot, genetic_code: List[int]) -> in
 
 
 def create_generation(
-        genetic_codes: List[int],
-        number_of_robots: int = 1000,
+        genetic_codes: List[List[int]],
+        robots_count: int = 1000,
         grid_length: int = 10
 ) -> dict:
     iterations = grid_length ** 2
 
     scores = {}
-    for robot_id in range(number_of_robots):
+    for robot_id in range(robots_count):
         grid_with_robot = GridWithRobot(grid_length=grid_length)  # TODO: jedna plansza dla wszystkich robotow
         score = 0
 
         for _ in range(iterations):
-            # TODO: inline choose_action ?
             action = choose_action(grid_with_robot=grid_with_robot, genetic_code=genetic_codes[robot_id])
 
             points_for_action = grid_with_robot.move(action)
-
-            assert points_for_action in [0, -1, -10, 10]
+            assert points_for_action in [0, -1, -5, 10]
             score += points_for_action
 
         # TODO: Szansa dla najsłabszych ?
@@ -136,21 +131,21 @@ def create_generation(
 def get_probabilities(scores: Dict[int, int]) -> Dict[int, float]:
     scores_sum = sum(scores.values())
     if scores_sum == 0:
-        return {key: 1/len(scores) for key in scores.key()}
+        return {key: 1/len(scores) for key in scores.keys()}
     return {key: value / scores_sum for key, value in scores.items()}
 
 
-def choose_pair_to_evolve(proba: Dict[int, float]) -> Tuple[int, int]:
+def choose_pair_to_evolve(probabilities: Dict[int, float]) -> Tuple[int, int]:
     pair = np.random.choice(
-        a=list(proba.keys()),
+        a=list(probabilities.keys()),
         size=2,
-        p=list(proba.values()),
+        p=list(probabilities.values()),
         replace=False)
     return tuple(pair)
 
 
-def evolve(parent1: List[int], parent2: List[int]) -> (list, list):
-    cutoff = int(len(parent1) / 2)
+def evolve(parent1: List[int], parent2: List[int]) -> Tuple[List[int], List[int]]:
+    cutoff = np.random.choice(list(GeneticCode.direction_indices.values()))  # int(len(parent1) / 2)
 
     # offspring
     child0 = parent1[:cutoff] + parent2[cutoff:]
@@ -159,57 +154,57 @@ def evolve(parent1: List[int], parent2: List[int]) -> (list, list):
     # mutation
     for child in [child0, child1]:
         idx_to_mutate = np.random.randint(low=0, high=len(child))
-        child[idx_to_mutate] = np.random.randint(low=0, high=len(Settings.actions))
+        child[idx_to_mutate] = np.random.randint(low=0, high=len(Action.actions))
 
     return child0, child1
 
 
-def evolve_generation(generation_scores: dict, genetic_codes: dict) -> List[]: # TODO: typy
-    probabilities = get_probabilities(generation_scores)
+def evolve_generation(scores: Dict[int, int], gen_codes: List[List[int]]) -> List[List[int]]: # TODO: typy
+    probabilities = get_probabilities(scores)
     new_genetic_codes: List[List[int]] = []
     while len(new_genetic_codes) < 1000:
-        p1_idx, p2_idx = choose_pair_to_evolve(proba=probabilities)
-        parent1 = genetic_codes[p1_idx]
-        parent2 = genetic_codes[p2_idx]
+        p1_idx, p2_idx = choose_pair_to_evolve(probabilities=probabilities)
+        parent1 = gen_codes[p1_idx]
+        parent2 = gen_codes[p2_idx]
         new_genetic_codes.extend(evolve(parent1, parent2))
 
     return new_genetic_codes
 
 
-def plot_results(results: List[int], type: str = 'Max') -> None:
+def plot_results(results: List[int], category: str = 'Max') -> None:
     fig = plt.figure(figsize=(12, 6))
     plt.plot(range(len(results)), results)
-    plt.title(type + ' fitness in population')
+    plt.title(category + ' fitness in population')
     plt.xlabel('Generation number')
-    plt.ylabel(type + ' fitness')
-    plt.savefig(f'../docs/{type}_fitness.png', dpi=fig.dpi)
+    plt.ylabel(category + ' fitness')
+    plt.savefig(f'../docs/{category}_fitness.png', dpi=fig.dpi)
     plt.show()
 
 
 if __name__ == "__main__":
     GRID_LENGTH: int = 10
-    number_of_robots: int = 1000
+    ROBOTS_COUNT: int = 1000
     number_of_generations: int = 1000
 
     # Generating initial genetic code randomly
-    genetic_codes = [
+    genetic_codes: List[List[int]] = [
         list(np.random.choice(
-            len(Settings.actions),
-            len(Settings.genetic_code_dict)))
-        for _ in range(number_of_robots)
+            len(Action.actions),
+            len(GeneticCode.direction_indices)))
+        for _ in range(ROBOTS_COUNT)
     ]
 
-    results = []
-    results_max = []
+    avg_results: List[int] = []
+    max_results: List[int] = []
     for _ in tqdm(range(number_of_generations)):
         generation_scores = create_generation(
             genetic_codes=genetic_codes,
-            number_of_robots=number_of_robots,
+            robots_count=ROBOTS_COUNT,
             grid_length=GRID_LENGTH)
         # print('\n', np.mean(generation_scores.values()), max(generation_scores.values()))
-        results.append(np.mean(list(generation_scores.values())))
-        results_max.append(max(generation_scores.values()))
-        genetic_codes = evolve_generation(generation_scores, genetic_codes)
+        avg_results.append(np.mean(list(generation_scores.values())))
+        max_results.append(max(generation_scores.values()))
+        genetic_codes = evolve_generation(scores=generation_scores, gen_codes=genetic_codes)
 
-    plot_results(results_max, 'max')
-    plot_results(results, 'avg')
+    plot_results(max_results, 'max')
+    plot_results(avg_results, 'avg')
