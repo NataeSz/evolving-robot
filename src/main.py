@@ -3,6 +3,14 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 from itertools import product
 from typing import List, Tuple, Dict
+from copy import deepcopy
+
+
+class Rewards:
+    NO_POINTS: int = 0
+    CAN: int = 10
+    NO_CAN: int = -1
+    WALL: int = -5
 
 
 class Neighbourhood:
@@ -29,25 +37,18 @@ class Action:
     movement_values: List[int] = [value['Move_up'], value['Move_down'], value['Move_right'], value['Move_left']]
 
 
-class Rewards:
-    NO_POINTS: int = 0
-    CAN: int = 10
-    NO_CAN: int = -1
-    WALL: int = -5
+class Grid:
+    def __init__(self, grid_length: int = 10, can_count: int = 20):
+        self.length: int = grid_length
+        self.can_count: int = can_count
+        self.current_position: Tuple[int, int] = (0, 0)
+        self.grid: np.array = self.__create_map(grid_length=grid_length, can_count=can_count)
 
-
-class GridWithRobot:
-    def __init__(self, grid_length: int = 10, can_probability: float = 0.5):
-        self.current_position = (0, 0)
-        self.grid = self.__create_map(grid_length=grid_length, can_probability=can_probability)
-
-    @staticmethod
-    def __create_map(grid_length: int = 10, can_probability: float = 0.5) -> np.array:  # TODO: napisz to ladniej
-        can_count = int((grid_length**2) * can_probability)
-        grid = np.zeros(grid_length**2, dtype=int)
-        can_indices = np.random.choice(list(range(grid_length**2)), size=can_count, replace=False)
+    def __create_map(self) -> np.array:
+        grid = [0] * self.length**2
+        can_indices = np.random.choice(list(range(len(grid))), size=self.can_count, replace=False)
         grid[can_indices] = Neighbourhood.states['Can']
-        grid = grid.reshape((grid_length, grid_length))
+        grid = grid.reshape((self.length, self.length))
         return grid
 
     def __is_on_can(self) -> bool:
@@ -55,6 +56,14 @@ class GridWithRobot:
 
     def __pick_can(self):
         self.grid[self.current_position] = Neighbourhood.states['Empty']
+
+    def __is_valid_position(self, new_position: Tuple[int, int]) -> bool:
+        boundaries = (-1, self.length)  # out-of-range indices
+        valid = not any(coord in boundaries for coord in new_position) # Check if new position is possible (no wall)
+        return valid
+
+    def __get_new_position(self, vector: Tuple[int, int]) -> Tuple[int, int]:
+        return tuple(map(sum, zip(self.current_position, vector)))
 
     def move(self, action: int) -> int:
         if action == Action.value['Stay']:
@@ -69,27 +78,19 @@ class GridWithRobot:
         if action == Action.value['Move_random']:
             action = np.random.choice(Action.movement_values)  # randomize movement
 
-        new_position = self.get_new_position(vector=Action.movement_vectors[action])
-        if not self.is_valid_position(new_position=new_position):
+        new_position = self.__get_new_position(vector=Action.movement_vectors[action])
+        if not self.__is_valid_position(new_position=new_position):
             return Rewards.WALL  # action impossible - wall
 
         self.current_position = new_position
         return Rewards.NO_POINTS
 
-    def get_new_position(self, vector: Tuple[int, int]) -> Tuple[int, int]:
-        return tuple(map(sum, zip(self.current_position, vector)))
-
-    def is_valid_position(self, new_position: Tuple[int, int]) -> bool:
-        boundaries = (-1, self.grid.shape[0])  # out-of-range indices
-        valid = not any(coord in boundaries for coord in new_position) # Check if new position is possible (no wall)
-        return valid
-
     def get_neighbourhood_hash(self) -> int:
         idx = []
         for val in list(Action.movement_vectors.keys())[1:]:  # check for 'North', 'South', 'East', 'West', 'Current'
-            checked_position = self.get_new_position(vector=Action.movement_vectors[val])
+            checked_position = self.__get_new_position(vector=Action.movement_vectors[val])
 
-            if not self.is_valid_position(new_position=checked_position):
+            if not self.__is_valid_position(new_position=checked_position):
                 idx.append(-1)
             else:
                 idx.append(self.grid[checked_position])
@@ -98,21 +99,21 @@ class GridWithRobot:
         return action_idx
 
 
-def choose_action(grid_with_robot: GridWithRobot, genetic_code: List[int]) -> int:
+def choose_action(grid_with_robot: Grid, genetic_code: List[int]) -> int:
     action_idx = grid_with_robot.get_neighbourhood_hash()
     return genetic_code[action_idx]
 
 
 def create_generation(
+        initial_grid: Grid,
         genetic_codes: List[List[int]],
-        robots_count: int = 1000,
-        grid_length: int = 10
+        robots_count: int = 1000
 ) -> dict:
-    iterations = grid_length ** 2
+    iterations = initial_grid.length ** 2 + initial_grid.can_count
 
     scores = {}
     for robot_id in range(robots_count):
-        grid_with_robot = GridWithRobot(grid_length=grid_length)  # TODO: jedna plansza dla wszystkich robotow
+        grid_with_robot = deepcopy(initial_grid)
         score = 0
 
         for _ in range(iterations):
@@ -122,7 +123,6 @@ def create_generation(
             assert points_for_action in [0, -1, -5, 10]
             score += points_for_action
 
-        # TODO: Szansa dla najsłabszych ?
         scores[robot_id] = max(score, 0)
 
     return scores
@@ -159,7 +159,7 @@ def evolve(parent1: List[int], parent2: List[int]) -> Tuple[List[int], List[int]
     return child0, child1
 
 
-def evolve_generation(scores: Dict[int, int], gen_codes: List[List[int]]) -> List[List[int]]: # TODO: typy
+def evolve_generation(scores: Dict[int, int], gen_codes: List[List[int]]) -> List[List[int]]:
     probabilities = get_probabilities(scores)
     new_genetic_codes: List[List[int]] = []
     while len(new_genetic_codes) < 1000:
@@ -184,6 +184,7 @@ def plot_results(results: List[int], category: str = 'Max') -> None:
 if __name__ == "__main__":
     GRID_LENGTH: int = 10
     ROBOTS_COUNT: int = 1000
+    CAN_COUNT: int = 20
     number_of_generations: int = 1000
 
     # Generating initial genetic code randomly
@@ -194,13 +195,14 @@ if __name__ == "__main__":
         for _ in range(ROBOTS_COUNT)
     ]
 
+    initial_grid = Grid(grid_length=GRID_LENGTH, can_count=CAN_COUNT)
     avg_results: List[int] = []
     max_results: List[int] = []
     for _ in tqdm(range(number_of_generations)):
         generation_scores = create_generation(
             genetic_codes=genetic_codes,
             robots_count=ROBOTS_COUNT,
-            grid_length=GRID_LENGTH)
+            initial_grid=initial_grid)
         # print('\n', np.mean(generation_scores.values()), max(generation_scores.values()))
         avg_results.append(np.mean(list(generation_scores.values())))
         max_results.append(max(generation_scores.values()))
