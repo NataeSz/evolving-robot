@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import argparse
 from tqdm import tqdm
 from itertools import product
 from typing import List, Tuple, Dict
@@ -110,12 +111,12 @@ def choose_action(grid_with_robot: Grid, genetic_code: List[int]) -> int:
 def create_generation(
         initial_grid: Grid,
         genetic_codes: List[List[int]],
-        robots_count: int = 1000
+        robot_count: int = 1000
 ) -> dict:
     iterations = initial_grid.length ** 2 + initial_grid.can_count
 
     scores = {}
-    for robot_id in range(robots_count):
+    for robot_id in range(robot_count):
         grid_with_robot = deepcopy(initial_grid)
         score = 0
 
@@ -164,10 +165,13 @@ def evolve(parent1: List[int], parent2: List[int]) -> Tuple[List[int], List[int]
     return child0, child1
 
 
-def evolve_generation(scores: Dict[int, int], gen_codes: List[List[int]]) -> List[List[int]]:
+def evolve_generation(
+        scores: Dict[int, int],
+        gen_codes: List[List[int]]
+) -> List[List[int]]:
     probabilities = get_probabilities(scores)
     new_genetic_codes: List[List[int]] = []
-    while len(new_genetic_codes) < 1000:
+    while len(new_genetic_codes) < len(gen_codes):
         p1_idx, p2_idx = choose_pair_to_evolve(probabilities=probabilities)
         parent1 = gen_codes[p1_idx]
         parent2 = gen_codes[p2_idx]
@@ -187,30 +191,37 @@ def plot_results(results: List[int], category: str = 'Max') -> None:
 
 
 if __name__ == "__main__":
-    GRID_LENGTH: int = 10
-    ROBOTS_COUNT: int = 1000
-    CAN_COUNT: int = 20
-    GENERATIONS_COUNT: int = 1000
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-g', '--generation-count', type=int, default=1000, help='Number of generations of robots')
+    parser.add_argument('-r', '--robot-count', type=int, default=1000, help='Number of robots in each generation')
+    parser.add_argument('-l', '--grid-length', type=int, default=10, help='Length of the grid side')
+    parser.add_argument('-c', '--can-count', type=int, default=20, help='Number of cans on a grid')
+    args = parser.parse_args()
+
+    if args.can_count > args.grid_length**2:
+        raise ValueError(
+            f'Number of cans ({args.can_count}) cannot exceed number of squares on a grid ({args.grid_length**2}).')
 
     # Generate initial genetic code randomly
     genetic_codes: List[List[int]] = [
         list(np.random.choice(
             len(Action.actions),
             len(GeneticCode.direction_indices)))
-        for _ in range(ROBOTS_COUNT)
+        for _ in range(args.robot_count)
     ]
 
-    initial_grid = Grid(grid_length=GRID_LENGTH, can_count=CAN_COUNT)
+    initial_grid = Grid(grid_length=args.grid_length, can_count=args.can_count)
     avg_results: List[int] = []
     max_results: List[int] = []
-    for _ in tqdm(range(GENERATIONS_COUNT)):
+    for _ in tqdm(range(args.generation_count)):
         generation_scores = create_generation(
             genetic_codes=genetic_codes,
-            robots_count=ROBOTS_COUNT,
+            robot_count=args.robot_count,
             initial_grid=initial_grid)
         avg_results.append(np.mean(list(generation_scores.values())))
         max_results.append(max(generation_scores.values()))
-        genetic_codes = evolve_generation(scores=generation_scores, gen_codes=genetic_codes)
+        genetic_codes = evolve_generation(scores=generation_scores,
+                                          gen_codes=genetic_codes)
 
     plot_results(max_results, 'max')
     plot_results(avg_results, 'avg')
