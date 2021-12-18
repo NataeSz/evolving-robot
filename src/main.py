@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from csv import writer
 import argparse
 from tqdm import tqdm
 from itertools import product
@@ -190,6 +191,10 @@ def plot_results(results: List[int], category: str = 'Max') -> None:
     plt.show()
 
 
+def plot_genetic_code(genetic_code: List[int]):
+    pass
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-g', '--generation-count', type=int, default=1000, help='Number of generations of robots')
@@ -220,8 +225,13 @@ if __name__ == "__main__":
             initial_grid=initial_grid)
         avg_results.append(np.mean(list(generation_scores.values())))
         max_results.append(max(generation_scores.values()))
+        best_idx = max(generation_scores, key=generation_scores.get)
+        best_genetic_code = genetic_codes[best_idx]
+
         genetic_codes = evolve_generation(scores=generation_scores,
                                           gen_codes=genetic_codes)
 
-    plot_results(max_results, 'max')
-    plot_results(avg_results, 'avg')
+    np.savetxt("../docs/best_genetic_code.csv", np.array(best_genetic_code), delimiter=",", fmt='%i')
+
+    # plot_results(max_results, 'max')
+    # plot_results(avg_results, 'avg')
