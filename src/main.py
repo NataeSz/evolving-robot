@@ -1,11 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from csv import writer
 import argparse
 from tqdm import tqdm
 from itertools import product
 from typing import List, Tuple, Dict
 from copy import deepcopy
+from time import sleep
 
 
 class Rewards:
@@ -39,6 +39,11 @@ class Action:
     movement_values: List[int] = [value['Move_up'], value['Move_down'], value['Move_right'], value['Move_left']]
 
 
+class MovementRepr:
+    can_repr = {0: '.', 1: 'o'}
+    current_position_repr = {can_repr[0]: '+', can_repr[1]: '⊕'}
+
+
 class Grid:
     def __init__(self, grid_length: int = 10, can_count: int = 20):
         self.length: int = grid_length
@@ -47,7 +52,7 @@ class Grid:
         self.grid: np.array = self.__create_map()
 
     def __create_map(self) -> np.array:
-        grid = np.zeros(shape=self.length**2, dtype=int)
+        grid = np.zeros(shape=self.length ** 2, dtype=int)
         can_indices = np.random.choice(
             list(range(len(grid))),
             size=self.can_count,
@@ -55,6 +60,12 @@ class Grid:
         grid[can_indices] = Neighbourhood.states['Can']
         grid = grid.reshape((self.length, self.length))
         return grid
+
+    def load_map_from_file(self, path: str = '../docs/grid.csv'):
+        pass
+
+    def get_movement_count(self):
+        return self.length ** 2 + self.can_count
 
     def __is_on_can(self) -> bool:
         return bool(self.grid[self.current_position])
@@ -114,7 +125,7 @@ def create_generation(
         genetic_codes: List[List[int]],
         robot_count: int = 1000
 ) -> dict:
-    iterations = initial_grid.length ** 2 + initial_grid.can_count
+    iterations = initial_grid.get_movement_count()
 
     scores = {}
     for robot_id in range(robot_count):
@@ -138,7 +149,7 @@ def create_generation(
 def get_probabilities(scores: Dict[int, int]) -> Dict[int, float]:
     scores_sum = sum(scores.values())
     if scores_sum == 0:
-        return {key: 1/len(scores) for key in scores.keys()}
+        return {key: 1 / len(scores) for key in scores.keys()}
     return {key: value / scores_sum for key, value in scores.items()}
 
 
@@ -191,11 +202,28 @@ def plot_results(results: List[int], category: str = 'Max') -> None:
     plt.show()
 
 
-def plot_genetic_code(genetic_code: List[int]):
-    pass
+def plot_movements(genetic_code: List[int] = None, grid: Grid = None, **kwargs):
+    if not genetic_code:
+        genetic_code = np.genfromtxt('../docs/best_genetic_code.csv', delimiter=',', dtype=int)
+    if not grid:
+        grid = Grid(**kwargs)
+
+    iterations = grid.get_movement_count()
+    print('\n' * 11)
+    for _ in range(iterations):
+        grid_repr = np.where(grid.grid == 1, MovementRepr.can_repr[1], MovementRepr.can_repr[0])
+        current_value = grid_repr[grid.current_position]
+        grid_repr[grid.current_position] = MovementRepr.current_position_repr[current_value]
+        print('\033[11A')
+        print(np.array2string(grid_repr, formatter={'str_kind': lambda x: x}, separator='  '))
+        sleep(0.3)
+        action = choose_action(
+            grid_with_robot=grid,
+            genetic_code=genetic_code)
+        _ = grid.move(action)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-g', '--generation-count', type=int, default=1000, help='Number of generations of robots')
     parser.add_argument('-r', '--robot-count', type=int, default=1000, help='Number of robots in each generation')
@@ -203,9 +231,9 @@ if __name__ == "__main__":
     parser.add_argument('-c', '--can-count', type=int, default=20, help='Number of cans on a grid')
     args = parser.parse_args()
 
-    if args.can_count > args.grid_length**2:
+    if args.can_count > args.grid_length ** 2:
         raise ValueError(
-            f'Number of cans ({args.can_count}) cannot exceed number of squares on a grid ({args.grid_length**2}).')
+            f'Number of cans ({args.can_count}) cannot exceed number of squares on a grid ({args.grid_length ** 2}).')
 
     # Generate initial genetic code randomly
     genetic_codes: List[List[int]] = [
@@ -231,7 +259,12 @@ if __name__ == "__main__":
         genetic_codes = evolve_generation(scores=generation_scores,
                                           gen_codes=genetic_codes)
 
-    np.savetxt("../docs/best_genetic_code.csv", np.array(best_genetic_code), delimiter=",", fmt='%i')
+    np.savetxt('../docs/grid.csv', initial_grid.grid, delimiter=',', fmt='%i')
+    np.savetxt('../docs/best_genetic_code.csv', np.array(best_genetic_code), delimiter=',', fmt='%i')
 
-    # plot_results(max_results, 'max')
-    # plot_results(avg_results, 'avg')
+    plot_movements(grid=initial_grid)
+
+    plot_results(max_results, 'max')
+    plot_results(avg_results, 'avg')
+
+# TODO: read grid from csv
