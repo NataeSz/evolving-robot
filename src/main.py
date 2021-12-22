@@ -203,6 +203,16 @@ def plot_results(results: List[int], category: str = 'Max') -> None:
     plt.show()
 
 
+def plot_max_avg(max_results: List[int], avg_results: List[int]) -> None:
+    fig = plt.figure(figsize=(12, 6))
+    plt.scatter(avg_results, max_results)
+    plt.title('Comparison of maximal and average fitness in population')
+    plt.xlabel('Average fitness')
+    plt.ylabel('Max fitness')
+    plt.savefig(f'../docs/max_avg_fitness.png', dpi=fig.dpi)
+    plt.show()
+
+
 def plot_movements(genetic_code: List[int] = None, grid: Grid = None, grid_from_csv: bool = False, **kwargs) -> None:
     if not genetic_code:
         genetic_code_path = '../docs/best_genetic_code.csv'
@@ -286,5 +296,4 @@ if __name__ == '__main__':
 
     plot_results(max_results, 'max')
     plot_results(avg_results, 'avg')
-
-# TODO: read grid from csv
+    plot_max_avg(max_results, avg_results)
