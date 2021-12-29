@@ -34,5 +34,5 @@ class Action:
 
 
 class MovementRepr:
-    can_repr = {0: '.', 1: 'o'}
-    current_position_repr = {can_repr[0]: '+', can_repr[1]: '⊕'}
+    can_repr: Dict[int, str] = {0: '.', 1: 'o'}
+    current_position_repr: Dict[str, str] = {can_repr[0]: '+', can_repr[1]: '⊕'}
