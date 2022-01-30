@@ -3,6 +3,18 @@
 Genetic algorithm for a simple rule-based robot on a 2D-grid
 
 ## Overview
+
+Genetic algorithm is search heuristic that reflects the process of natural selection.
+It consists of five phases:
+- Initial population
+- Fitness function
+- Selection
+- Crossover
+- Mutation
+
+In this project, the genetic algorithm has been used to find the best set of movement rules for a robot on a grid that collects cans.
+
+## Details
 ### Robby and his World
 
 Robby is a very simple robot. He lives in a simulated world, consisting of a small (10x10) grid of squares.
@@ -52,6 +64,5 @@ by sampling two parents and producing a child until N children are created.
 For a robot, the probability of being chosen to be a parent should depend on its score (better score = higher probability).
 Child genetic code is created by concatenating a prefix from one parent and a suffix from the other one, to create a complete rule table.
 Additionally, a small number of mutations should be introduced.
-
 
 
