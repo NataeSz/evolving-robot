@@ -49,7 +49,7 @@ def plot_movements(genetic_code: List[int] = None, grid: Grid = None, grid_from_
 
     iterations = grid.get_movement_count()
     total_points = 0
-    add_line_count = 4
+    add_line_count = 10
     print('\n' * (grid.length + add_line_count))
     for _ in range(iterations):
         grid_repr = np.where(grid.grid == 1, MovementRepr.can_repr[1], MovementRepr.can_repr[0])
@@ -63,6 +63,10 @@ def plot_movements(genetic_code: List[int] = None, grid: Grid = None, grid_from_
             genetic_code=genetic_code)
         points_for_action = grid.move(action)
         total_points += points_for_action
-        print()
-        print('Points for the action:\t', points_for_action)
+        print('\nPoints for the action:\t', points_for_action)
         print('Total points:\t\t', total_points)
+        print('\nLegend:')
+        print('\t', MovementRepr.current_position_repr[MovementRepr.can_repr[0]], '\t- robot on an empty square')
+        print('\t', MovementRepr.current_position_repr[MovementRepr.can_repr[1]], '\t- robot on a square with a can')
+        print('\t', MovementRepr.can_repr[0], '\t- empty square')
+        print('\t', MovementRepr.can_repr[1], '\t- can')
