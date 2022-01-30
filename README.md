@@ -66,3 +66,11 @@ Child genetic code is created by concatenating a prefix from one parent and a su
 Additionally, a small number of mutations should be introduced.
 
 
+## Build and Run
+
+```
+git clone git@github.com:NataeSz/evolving-robot.git
+pip install -r ./src/requirements.txt
+./src/main.py --generation-count 500  # Find best genotype within 500 generations
+./src/track_movement.py  # Interactively show simulation
+```
